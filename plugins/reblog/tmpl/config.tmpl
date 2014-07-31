@@ -130,6 +130,27 @@
     </select>
 </mtapp:setting>
 
+<mtapp:setting
+    id="entry_status"
+    label="<__trans phrase="Entry Status">"
+    hint="Specify the status of imported entries."
+    show_hint="1">
+    <select name="entry_status" id="entry_status">
+        <option value="blog_default"
+            <mt:If name="entry_status" eq="blog_default">selected="selected"</mt:If>>
+            Blog default
+        </option>
+        <option value="1"
+            <mt:if name="entry_status" eq="1">selected="selected"</mt:if>>
+            Unpublished
+        </option>
+        <option value="2"
+            <mt:If name="entry_status" eq="2">selected="selected"</mt:If>>
+            Published
+        </option>
+    </select>
+</mtapp:setting>
+
 <mt:include name="include/actions_bar.tmpl" bar_position="bottom" hide_pager="1">
 <mt:setvarblock name="form_footer">
 </form>

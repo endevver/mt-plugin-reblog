@@ -105,6 +105,12 @@ sub config {
                 $blog_shortcut );
         }
 
+        $plugin->set_config_value(
+            'entry_status',
+            $app->param('entry_status'),
+            $blog_shortcut
+        );
+
         # Get the hash of the new values so that we can compare to the old
         # values to determine what changed and what to record to the Activity
         # Log.
@@ -194,6 +200,8 @@ sub config {
             'import_feed_title_as_category',
             $blog_shortcut
         );
+    $param->{entry_status}
+        = $plugin->get_config_value( 'entry_status', $blog_shortcut );
 
     # Status messaging.
     $param->{saved} = $app->param('save');

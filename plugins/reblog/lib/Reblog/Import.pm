@@ -306,6 +306,7 @@ sub import_entries {
     my $class = shift;
     my ( $sourcefeed, $args ) = @_;
     my $app = MT->instance;
+    my $plugin = $app->component('reblog');
 
     my ( $blog_id, $author, $suppress, $cache_ttl );
     $blog_id   = $args->{blog_id};
@@ -351,7 +352,6 @@ sub import_entries {
     }
     my $mt_vers = MT->version_number;
     my (@entries);
-    my $plugin = MT->component('reblog');
 
     require LWP::UserAgent;
     my $ua = MT->new_ua( { timeout => 20 } );
@@ -696,7 +696,18 @@ sub import_entries {
             {
                 $entry = MT::Entry->new();
                 $entry->blog_id($blog_id);
-                $entry->status( $blog->status_default );
+
+                # The entry status could be defined by reblog, or it could be
+                # the blog default.
+                my $status = $plugin->get_config_value(
+                    'entry_status',
+                    'blog:' . $blog_id
+                );
+                if ( !$status || $status eq 'blog_default' ) {
+                    $status = $blog->status_default;
+                }
+                $entry->status( $status );
+
                 $entry->allow_comments( $blog->allow_comments_default );
                 $entry->allow_pings( $blog->allow_pings_default );
                 $entry->convert_breaks(0);
