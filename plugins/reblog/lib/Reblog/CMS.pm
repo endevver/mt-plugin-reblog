@@ -690,7 +690,7 @@ sub menu_permission_sourcefeeds_mt5 {
 }
 
 sub menu_permission_sourcefeeds_mt4 {
-    return 0 if MT->product_version =~ /^5/; # MT5 only
+    return 0 if MT->product_version !~ /^4/; # MT4 only
     return _menu_permission_sourcefeeds();
 }
 
