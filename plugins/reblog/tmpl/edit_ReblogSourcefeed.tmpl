@@ -213,7 +213,15 @@ function validateForm() {
         </div>
     </div>
 </div>
-</fieldset>
+
+<mt:If name="id">
+    <mtapp:setting
+        id="activity"
+        label="<__trans phrase="Activity">">
+        <p><__trans phrase="Last Read">: <mt:Var name="last_read" _default="never"></p>
+        <p><__trans phrase="Last Fired">: <mt:Var name="last_fired" _default="never"></p>
+    </mtapp:setting>
+</mt:If>
 
 <mt:include name="include/actions_bar.tmpl" bar_position="bottom" hide_pager="1">
 <mt:setvarblock name="form_footer">

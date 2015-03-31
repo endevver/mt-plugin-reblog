@@ -452,6 +452,16 @@ sub edit_sourcefeed {
         $param{$col}
             = defined $q->param($col) ? $q->param($col) : $obj->$col();
     }
+    
+    # Nicely format the two date columns.
+    my $blog = $app->model('blog')->load( $obj->blog_id );
+    foreach my $col ( ('last_read', 'last_fired') ) {
+        my $ts = $param{$col};
+        $param{$col} = MT::Util::format_ts(
+            undef,
+            MT::Util::epoch2ts( $blog, $ts )
+        );
+    }
 
     if ( $class->can('class_label') ) {
         $param{object_label} = $class->class_label;
