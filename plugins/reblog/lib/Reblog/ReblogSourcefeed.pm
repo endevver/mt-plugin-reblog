@@ -30,6 +30,7 @@ __PACKAGE__->install_properties(
             'url'          => 'string(' . URL_SIZE . ') not null',
             'is_active'    => 'boolean not null',
             'is_excerpted' => 'boolean not null',
+            'build_assets' => 'boolean not null',
             'category_id'  => 'integer',
             'last_read'    => 'integer',
             # Does this column actually do anything? It's only used in the

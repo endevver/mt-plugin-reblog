@@ -183,6 +183,19 @@ function validateForm() {
 </mtapp:setting>
 
 <mtapp:setting
+    id="build_assets"
+    label="Import Enclosures as Assets"
+    hint="Any enclosures found in this feed should be downloaded and imported into Movable Type as Assets. The enclosure URL is available regardless of this option&lrsquo;s setting."
+    show_hint="1">
+        <input type="checkbox"
+            name="build_assets"
+            id="build_assets"
+            <mt:If name="build_assets">checked</mt:If>
+            value="1" />
+</mtapp:setting>
+
+
+<mtapp:setting
     id="clear_errors"
     label="<__trans phrase="Clear Errors">"
     hint="Reset the Failed Load Threshold for this feed to zero (0)."

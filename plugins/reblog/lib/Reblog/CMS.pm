@@ -285,6 +285,9 @@ sub cms_sourcefeed_presave_callback {
         $feed->has_error(0);
         $feed->consec_fails(0);
     }
+    unless ( $app->param('build_assets') ) {
+        $feed->build_assets(0);
+    }
     return 1;
 }
 

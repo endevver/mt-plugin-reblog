@@ -18,21 +18,21 @@ use base qw( Class::ErrorHandler );
 
 use strict;
 use warnings;
-
 use POSIX;
-
 use Date::Parse;
-
-use MT::Author;
-use MT::Blog;
-use MT::Util qw( offset_time ts2epoch epoch2ts dirify );
-
 use URI::Fetch;
 use XML::XPath;
 use XML::XPath::XMLParser;
-
+use File::Basename;
+use Digest::MD5 qw( md5_hex );
+use LWP::Simple;
 use Carp;
 use Encode;
+
+use MT::Author;
+use MT::Blog;
+use MT::FileMgr;
+use MT::Util qw( offset_time ts2epoch epoch2ts dirify );
 
 use constant SPLIT_TOKEN => chr(28);
 
@@ -276,7 +276,7 @@ sub create_category {
     $cat->save() or die $cat->errstr;
 
     MT->log({
-       message => MT->translate(
+        message => MT->translate(
             "Category '[_1]' created by '[_2]'", $cat->label,
             $author->name
         ),
@@ -827,6 +827,17 @@ sub import_entries {
                     metadata => $entry->id,
                 });
 
+                # If there's an enclosure and if the "build assets" checkbox
+                # was checked, we want to build an asset and the asset-entry
+                # association.
+                _build_asset({
+                    app         => $app,
+                    sourcefeed  => $sourcefeed,
+                    reblog_data => $rb_data,
+                    entry       => $entry,
+                    blog        => $blog,
+                });
+
                 MT->run_callbacks( 'plugin_reblog_new_or_changed_entry_parsed', $entry, $rb_data,
                     { parser_type => 'XML::XPath', parser => $xp, node => $node }
                 );
@@ -854,6 +865,148 @@ sub import_entries {
         return $class->error("Failed to fetch RSS feed from $source_rss");
     }
     return (@entries);
+}
+
+# Turn an enclosure into an asset.
+sub _build_asset {
+    my ($arg_ref)   = @_;
+    my $app         = $arg_ref->{app};
+    my $sourcefeed  = $arg_ref->{sourcefeed};
+    my $reblog_data = $arg_ref->{reblog_data};
+    my $entry       = $arg_ref->{entry};
+    my $blog        = $arg_ref->{blog};
+
+    # If assets are not requested or if there is no enclosure URL, give up.
+    return unless $sourcefeed->build_assets && $reblog_data->encl_url;
+
+    my ($name, $path, $ext) = fileparse($reblog_data->encl_url, qr/\.[^.]*/);
+    my $link = $reblog_data->encl_url;
+    $link =~ s/\s/%20/g;
+
+    # The $dest_path is the file system location where the file should be saved.
+    my $dest_path = $blog->site_path;
+    $dest_path .= '/' unless $dest_path =~ m!/$!;
+    $dest_path .= dirify($sourcefeed->label);
+
+    my $fmgr = MT::FileMgr->new('Local');
+    $fmgr->mkpath($dest_path)
+        or return $app->log({
+            blog_id  => $blog->id,
+            category => 'build_asset',
+            class    => 'reblog',
+            level    => $app->model('log')->ERROR(),
+            message  => "Reblog can't create the destination path $dest_path.",
+        });
+
+    $dest_path .= '/' . md5_hex($link) . $ext;
+
+    # The $dest_url is where the saved file can be accessed.
+    my $dest_url = $blog->site_url;
+    $dest_url .= '/' unless $dest_url =~ m!/$!;
+    $dest_url .= dirify($sourcefeed->label) . '/' . md5_hex($link) . $ext;
+
+    # Has this file been previously saved?
+    if ( !-e $dest_path ) {
+        # The file has not been previously saved. Download it, save it, create
+        # an asset, and an entry-asset association.
+        my $result = getstore(
+            $reblog_data->encl_url,
+            $dest_path
+        );
+
+        # The image couldn't be downloaded or saved for some reason.
+        if ($result != 200) {
+            return $app->log({
+                blog_id  => $blog->id,
+                category => 'build_asset',
+                class    => 'reblog',
+                level    => $app->model('log')->ERROR(),
+                message  => "Reblog can't download or save the image at the "
+                    . "URL $link, to be saved at the destination $dest_path.",
+            });
+        }
+    }
+
+    # At this point the file exists locally. Is it an asset already? Check with
+    # as many arguments as possible, just in case there's a similarly-named
+    # asset. If no asset, create one.
+    my $asset = $app->model('asset')->load({
+        blog_id   => $blog->id,
+        class     => 'image',
+        file_ext  => $ext,
+        file_name => $name . $ext,
+        mime_type => $reblog_data->encl_type,
+    });
+
+    # The asset wasn't found, so create it.
+    if ( !$asset ) {
+        my $file_location = '%r/' . dirify($sourcefeed->label) . '/'
+            . md5_hex($link) . $ext;
+
+        $asset = $app->model('asset')->new();
+        $asset->blog_id(   $blog->id               );
+
+        # Grab the first part of the mime type, which is most likely "image" and
+        # exactly what we want to use to specify the class of the asset.
+        my $class = $reblog_data->encl_type;
+        ($class) = split( '/', $class );
+        $asset->class(     $class                  );
+
+        $ext =~ s!\.(.*)!$1!; # Drop the leading period.
+        $asset->file_ext(  $ext                    );
+        $asset->file_name( "$name.$ext"            );
+        $asset->file_path( $file_location          );
+        $asset->label(     $name                   );
+        $asset->mime_type( $reblog_data->encl_type );
+        $asset->url(       $file_location          );
+        $asset->save or return $app->log({
+            blog_id  => $blog->id,
+            category => 'build_asset',
+            class    => 'reblog',
+            level    => $app->model('log')->ERROR(),
+            message  => "Reblog can't create an asset for the enclosure at "
+                . "URL $link, to be saved at the destination $dest_path.",
+        });
+
+        # Note the creation of a new asset in the Activity Log.
+        $app->log({
+            blog_id  => $blog->id,
+            category => 'new',
+            class    => 'asset',
+            level    => $app->model('log')->INFO(),
+            message  => $app->translate(
+                "Asset '[_1]' (ID:[_2]) added by Reblog for entry '[_3]' (ID:[_4])",
+                $asset->label, $asset->id, $entry->title, $entry->id
+            ),
+        });
+    }
+
+    # Now we have an asset. Is it associated with the entry already? If it is,
+    # we don't need to do anything further. If it's not associated, create an
+    # entry-asset association.
+    if (
+        ! $app->model('objectasset')->exist({
+            asset_id  => $asset->id,
+            blog_id   => $blog->id,
+            object_ds => 'entry',
+            object_id => $entry->id,
+        })
+    ) {
+        my $objectasset = $app->model('objectasset')->new();
+        $objectasset->asset_id(  $asset->id );
+        $objectasset->blog_id(   $blog->id  );
+        $objectasset->object_ds( 'entry'    );
+        $objectasset->object_id( $entry->id );
+        $objectasset->save or return $app->log({
+            blog_id  => $blog->id,
+            category => 'build_asset',
+            class    => 'reblog',
+            level    => $app->model('log')->ERROR(),
+            message  => "Reblog can't save an entry-asset association for the "
+                . 'asset ' . $asset->label . ' (ID ' . $asset->id . ') and '
+                . 'entry ' . $entry->title . ' (ID ' . $entry->id . ').',
+        });
+    }
 }
 
 sub determine_file_type {
