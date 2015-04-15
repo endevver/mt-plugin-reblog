@@ -880,13 +880,24 @@ sub _build_asset {
     return unless $sourcefeed->build_assets && $reblog_data->encl_url;
 
     my ($name, $path, $ext) = fileparse($reblog_data->encl_url, qr/\.[^.]*/);
-    my $link = $reblog_data->encl_url;
-    $link =~ s/\s/%20/g;
+    my $label =  $name;
+    my $link  =  $reblog_data->encl_url;
+    $link     =~ s/\s/%20/g;
+    $name     =  md5_hex($link);
+    $ext      =~ s!\.(.*)!$1!; # Drop the leading period.
+
+    my $mime_type = $reblog_data->encl_type;
+    # Grab the first part of the mime type, which is most likely "image" and
+    # exactly what we want to use to specify the class of the asset.
+    my $class = $mime_type;
+    ($class) = split( '/', $class );
+
+    my $dest_folder = dirify($sourcefeed->label);
 
     # The $dest_path is the file system location where the file should be saved.
     my $dest_path = $blog->site_path;
     $dest_path .= '/' unless $dest_path =~ m!/$!;
-    $dest_path .= dirify($sourcefeed->label);
+    $dest_path .= $dest_folder;
 
     my $fmgr = MT::FileMgr->new('Local');
     $fmgr->mkpath($dest_path)
@@ -898,12 +909,12 @@ sub _build_asset {
             message  => "Reblog can't create the destination path $dest_path.",
         });
 
-    $dest_path .= '/' . md5_hex($link) . $ext;
+    $dest_path .= '/' . "$name.$ext";
 
     # The $dest_url is where the saved file can be accessed.
     my $dest_url = $blog->site_url;
     $dest_url .= '/' unless $dest_url =~ m!/$!;
-    $dest_url .= dirify($sourcefeed->label) . '/' . md5_hex($link) . $ext;
+    $dest_url .= $dest_folder . '/' . "$name.$ext";
 
     # Has this file been previously saved?
     if ( !-e $dest_path ) {
@@ -932,40 +943,33 @@ sub _build_asset {
     # asset. If no asset, create one.
     my $asset = $app->model('asset')->load({
         blog_id   => $blog->id,
-        class     => 'image',
+        class     => $class,
         file_ext  => $ext,
-        file_name => $name . $ext,
-        mime_type => $reblog_data->encl_type,
+        file_name => "$name.$ext",
+        mime_type => $mime_type,
     });
 
     # The asset wasn't found, so create it.
     if ( !$asset ) {
-        my $file_location = '%r/' . dirify($sourcefeed->label) . '/'
-            . md5_hex($link) . $ext;
+        my $file_location = '%r/' . $dest_folder . '/' . "$name.$ext";
 
         $asset = $app->model('asset')->new();
-        $asset->blog_id(   $blog->id               );
-
-        # Grab the first part of the mime type, which is most likely "image" and
-        # exactly what we want to use to specify the class of the asset.
-        my $class = $reblog_data->encl_type;
-        ($class) = split( '/', $class );
-        $asset->class(     $class                  );
-
-        $ext =~ s!\.(.*)!$1!; # Drop the leading period.
-        $asset->file_ext(  $ext                    );
-        $asset->file_name( "$name.$ext"            );
-        $asset->file_path( $file_location          );
-        $asset->label(     $name                   );
-        $asset->mime_type( $reblog_data->encl_type );
-        $asset->url(       $file_location          );
+        $asset->blog_id(   $blog->id      );
+        $asset->class(     $class         );
+        $asset->file_ext(  $ext           );
+        $asset->file_name( "$name.$ext"   );
+        $asset->file_path( $file_location );
+        $asset->label(     $label         );
+        $asset->mime_type( $mime_type     );
+        $asset->url(       $file_location );
         $asset->save or return $app->log({
             blog_id  => $blog->id,
             category => 'build_asset',
             class    => 'reblog',
             level    => $app->model('log')->ERROR(),
             message  => "Reblog can't create an asset for the enclosure at "
-                . "URL $link, to be saved at the destination $dest_path.",
+                . "URL $link, to be saved at the destination $dest_path. "
+                . $asset->errstr,
         });
 
         # Note the creation of a new asset in the Activity Log.
