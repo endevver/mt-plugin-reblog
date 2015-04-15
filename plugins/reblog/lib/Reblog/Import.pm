@@ -972,6 +972,42 @@ sub _build_asset {
                 . $asset->errstr,
         });
 
+        # Add an "@enclosure" tag, just to indicate what this assets source is.
+        my $tag = $app->model('tag')->load({
+            name => '@enclosure',
+        });
+
+        # Tag not found, so create it.
+        if (!$tag) {
+            $tag = $app->model('tag')->new();
+            $tag->is_private( 1           );
+            $tag->name(      '@enclosure' );
+            $tag->save or return $app->log({
+                blog_id  => $blog->id,
+                category => 'build_asset',
+                class    => 'reblog',
+                level    => $app->model('log')->ERROR(),
+                message  => 'Reblog can\'t create the tag "@enclosure. " '
+                    . $tag->errstr,
+            });
+        }
+
+        # Save the @enclosure tag with the new asset.
+        my $objecttag = $app->model('objecttag')->new();
+        $objecttag->blog_id(           $blog->id  );
+        $objecttag->object_datasource( 'asset'    );
+        $objecttag->object_id(         $asset->id );
+        $objecttag->tag_id(            $tag->id   );
+        $objecttag->save or return $app->log({
+            blog_id  => $blog->id,
+            category => 'build_asset',
+            class    => 'reblog',
+            level    => $app->model('log')->ERROR(),
+            message  => 'Reblog can\'t save the tag "@enclosure" with the asset'
+                . $asset->label . '(ID:' . $asset->id . '). '
+                . $objecttag->errstr,
+        });
+
         # Note the creation of a new asset in the Activity Log.
         $app->log({
             blog_id  => $blog->id,
