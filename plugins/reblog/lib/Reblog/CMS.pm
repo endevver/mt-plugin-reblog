@@ -620,6 +620,7 @@ sub inline_edit_entry {
         $addition->param( ANNOTATION     => $app->param('annotation') );
         $addition->param( SOURCE_TITLE   => $app->param('source_title') );
         $addition->param( SOURCE_LINK    => $app->param('source_link') );
+        $addition->param( SOURCE_AUTHOR  => $app->param('source_author') );
         $addition->param( VIA_LINK       => $app->param('via_link') );
         $addition->param( THUMBNAIL_LINK => $app->param('thumbnail_link') );
         $addition->param( THUMBNAIL_URL  => $app->param('thumbnail_url') );
@@ -629,6 +630,7 @@ sub inline_edit_entry {
         $addition->param( ANNOTATION     => $reblog_data->annotation );
         $addition->param( SOURCE_TITLE   => $reblog_data->src_title );
         $addition->param( SOURCE_LINK    => $reblog_data->src_url );
+        $addition->param( SOURCE_AUTHOR  => $reblog_data->src_author );
         $addition->param( VIA_LINK       => $reblog_data->via_link );
         $addition->param( THUMBNAIL_LINK => $reblog_data->thumbnail_link );
         $addition->param( THUMBNAIL_URL  => $reblog_data->thumbnail_url );
