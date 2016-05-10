@@ -33,6 +33,7 @@ __PACKAGE__->install_properties(
             'build_assets' => 'boolean not null',
             'category_id'  => 'integer',
             'last_read'    => 'integer',
+            'frequency'    => 'integer',
             # Does this column actually do anything? It's only used in the
             # inject_worker function below.
             'last_fired'   => 'integer',
@@ -73,13 +74,16 @@ sub inject_worker {
     require MT::TheSchwartz;
     require TheSchwartz::Job;
     require Reblog::Util;
+
     $self->last_fired( time() );
     $self->save;
+
     my $blog_id = $self->blog_id;
     my $plugin  = MT->component('reblog');
-    my $frequency
-        = $plugin->get_config_value( 'frequency', 'blog:' . $blog_id );
-    $frequency ||= Reblog::Util::DEFAULT_FREQUENCY();
+    my $frequency = $self->frequency
+        || $plugin->get_config_value( 'frequency', 'blog:' . $blog_id )
+        || Reblog::Util::DEFAULT_FREQUENCY();
+
     my $current_epoch;
     $current_epoch = $self->last_fired;
     $current_epoch ||= time();
@@ -88,6 +92,7 @@ sub inject_worker {
     if ( $next_epoch < time() ) {
         $next_epoch = time() + $frequency;
     }
+
     my $job = TheSchwartz::Job->new();
     $job->funcname('Reblog::Worker::Import');
     $job->uniqkey( 'reblog_' . $self->id );

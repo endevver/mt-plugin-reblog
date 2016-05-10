@@ -170,17 +170,7 @@ sub config {
     }
     $param->{author_loop}    = \@author_loop;
 
-    $param->{frequency_loop} = [
-        { frequency => 'Every 24 hours',   seconds => 24 * 60 * 60 },
-        { frequency => 'Every 12 hours',   seconds => 12 * 60 * 60 },
-        { frequency => 'Every 6 hours',    seconds => 6 * 60 * 60 },
-        { frequency => 'Every 3 hours',    seconds => 3 * 60 * 60 },
-        { frequency => 'Hourly',           seconds => 60 * 60 },
-        { frequency => 'Every 30 minutes', seconds => 30 * 60 },
-        { frequency => 'Every 15 minutes', seconds => 15 * 60 },
-        { frequency => 'Every 10 minutes', seconds => 10 * 60 },
-        { frequency => 'Every 5 minutes',  seconds => 5 * 60 }
-    ];
+    $param->{frequency_loop} = _build_frequency_array();
 
     $param->{blog_name} = $blog->name;
     $param->{display_entry_details}
@@ -207,6 +197,23 @@ sub config {
     $param->{saved} = $app->param('save');
 
     $app->build_page( $tmpl, $param );
+}
+
+# Create an array of frequency options. These are used on both the Reblog
+# Configuration (as blog-level default) and Edit Sourcefeed (as
+# sourcefeed-level settings).
+sub _build_frequency_array {
+    return [
+        { frequency_label => 'Every 24 hours',   seconds => 24 * 60 * 60 },
+        { frequency_label => 'Every 12 hours',   seconds => 12 * 60 * 60 },
+        { frequency_label => 'Every 6 hours',    seconds => 6 * 60 * 60 },
+        { frequency_label => 'Every 3 hours',    seconds => 3 * 60 * 60 },
+        { frequency_label => 'Hourly',           seconds => 60 * 60 },
+        { frequency_label => 'Every 30 minutes', seconds => 30 * 60 },
+        { frequency_label => 'Every 15 minutes', seconds => 15 * 60 },
+        { frequency_label => 'Every 10 minutes', seconds => 10 * 60 },
+        { frequency_label => 'Every 5 minutes',  seconds => 5 * 60 }
+    ];
 }
 
 # On the Manage Sourcefeeds screen is an Import list action/button that will
@@ -448,6 +455,8 @@ sub edit_sourcefeed {
         $obj = $class->new;
     }
 
+    $param{frequency_loop} = _build_frequency_array();
+
     my $cols = $class->column_names;
 
     # Populate the param hash with the object's own values
@@ -455,7 +464,12 @@ sub edit_sourcefeed {
         $param{$col}
             = defined $q->param($col) ? $q->param($col) : $obj->$col();
     }
-    
+
+    # Frequency not specified? Fall back to using the blog default value.
+    $param{frequency}
+        = $plugin->get_config_value( 'frequency', 'blog:' . $q->param('blog_id') )
+            if ! $param{frequency};
+
     # Nicely format the two date columns.
     my $blog = $app->model('blog')->load( $obj->blog_id );
     foreach my $col ( ('last_read', 'last_fired') ) {

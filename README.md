@@ -11,6 +11,7 @@ Reblog supports the following versions of Movable Type:
 
 * Movable Type 4.25+
 * Movable Type 5.1+
+* Movable Type 6+
 
 ## Additional Perl Module Requirements
 

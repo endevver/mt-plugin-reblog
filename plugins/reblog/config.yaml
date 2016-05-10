@@ -1,8 +1,8 @@
 name:           Reblog
 id:             reblog
 key:            reblog
-version:        2.5.14
-schema_version: 6
+version:        2.5.15
+schema_version: 7
 description:    Plugin for automatic syndication with attribution.
 plugin_link:    https://github.com/movabletype/mt-plugin-reblog
 author_name:    Original Reblog by Eyebeam & Stamen, with many revisions by Six Apart, Ltd., After6 Services LLC, 601am LLC, and Endevver.
