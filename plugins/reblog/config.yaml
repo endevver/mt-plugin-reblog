@@ -1,7 +1,7 @@
 name:           Reblog
 id:             reblog
 key:            reblog
-version:        2.5.15
+version:        2.5.16
 schema_version: 7
 description:    Plugin for automatic syndication with attribution.
 plugin_link:    https://github.com/movabletype/mt-plugin-reblog
