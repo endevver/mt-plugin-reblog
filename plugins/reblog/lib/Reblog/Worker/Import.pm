@@ -49,37 +49,49 @@ sub work {
     foreach $job (@jobs) {
         my $hash          = $job->arg;
         my $sourcefeed_id = $job->uniqkey;
+        my $msg;
 
         $sourcefeed_id =~ s/^reblog_//;
-        my $sourcefeed = Reblog::ReblogSourcefeed->load($sourcefeed_id)
-            or $mt->log({
+        my $sourcefeed = Reblog::ReblogSourcefeed->load({ id => $sourcefeed_id});
+        if (!$sourcefeed) {
+            $msg = "Reblog could not find a sourcefeed with the ID "
+                . "$sourcefeed_id.";
+            $mt->log({
                 level    => $mt->model('log')->ERROR(),
                 class    => 'reblog',
                 category => 'import',
-                message  => "Reblog could not find a sourcefeed with the ID "
-                    . "$sourcefeed_id.",
+                message  => $msg,
             });
+            $job->failed('Error with Reblog job ' . $job->id . ': ' . $msg);
+            next;
+        }
 
         MT::TheSchwartz->debug(
             "Importing sourcefeed $sourcefeed_id (" . $sourcefeed->url . ")..."
         );
 
         my $blog_id = $sourcefeed->blog_id;
-        my $blog    = $mt->model('blog')->load($blog_id)
-            or $mt->log({
+        my $blog    = $mt->model('blog')->load({ id => $blog_id });
+        if (!$blog) {
+            $msg = "Reblog could not find a blog with the ID $blog_id for "
+                . "sourcefeed ID $sourcefeed_id.";
+            $mt->log({
                 level    => $mt->model('log')->ERROR(),
                 class    => 'reblog',
                 category => 'import',
                 blog_id  => $blog_id,
-                message  => "Reblog could not find a blog with the ID $blog_id.",
+                message  => $msg,
             });
+            $job->failed('Error with Reblog job ' . $job->id . ': ' . $msg);
+            next;
+        }
 
         my $plugin    = MT->component('reblog');
         my $author_id = $plugin->get_config_value(
             'default_author',
             'blog:' . $blog_id
         );
-        my $author = MT::Author->load($author_id);
+        my $author = MT::Author->load({ id => $author_id });
         if (!$author) {
             $mt->log({
                 level    => $mt->model('log')->ERROR(),
